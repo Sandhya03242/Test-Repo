@@ -17,7 +17,7 @@ async def get_recent_actions_events(limit:int=10)->str:
     return json.dumps(events[-limit:],indent=2)
 
 
-MCP_SERVER_URL="http://localhost:9000/get_recent_actions_events"
+MCP_SERVER_URL = "http://localhost:9000/get_recent_actions_events"
 
 async def get_repository_status():
         try:
