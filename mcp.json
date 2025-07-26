@@ -1,0 +1,6 @@
+{
+    "tools":["client.check_repo_status"],
+    "model":"gpt-4.1-nano",
+    "name":"GiTHub Repo Status Agent",
+    "description":"A tool to check the status of a GitHub repository and summarize events."
+}
