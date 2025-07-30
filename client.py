@@ -75,6 +75,7 @@ async def main():
                     tool_call_id=call.id
                     tool_result = await mcp_client.call_tool(tool_name,**arguments)
                     tool_results.append({"role": "tool", "tool_call_id":tool_call_id, "content": str(tool_result)})
+
                 messages.append(choice.message)
                 messages.extend(tool_results)
 
