@@ -1,28 +1,43 @@
-from fastapi import FastAPI, Request
-import uvicorn
 import json
+from datetime import datetime
 from pathlib import Path
-app = FastAPI()
+from aiohttp import web
+
 EVENTS_FILE = Path(__file__).parent / "github_events.json"
-@app.post("/webhook/github")
-async def receive_event(request: Request):
-    payload = await request.json()
-    event_type = request.headers.get("X-GitHub-Event", "unknown")
-    sender = payload.get("sender", {})
-    event = {
-        "event_type": event_type,
-        "sender": sender,
-        "payload": payload
-    }
-    if EVENTS_FILE.exists():
-        with EVENTS_FILE.open("r") as file:
-            events = json.load(file)
-    else:
+
+async def handle_webhook(request):
+    try:
+        data = await request.json()
+
+        event = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "event_type": request.headers.get("X-GitHub-Event", "unknown"),
+            "action": data.get("action"),
+            "workflow_run": data.get("workflow_run"),
+            "check_run": data.get("check_run"),
+            "repository": data.get("repository", {}).get("full_name"),
+            "sender": data.get("sender", {}).get("login")
+        }
+
         events = []
-    events.append(event)
-    with EVENTS_FILE.open("w") as file:
-        json.dump(events, file, indent=2)
-    print(f"Received GiTHub event: {event_type}")
-    return {"message": "Event received successfully"}
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0",port=9000)
+        if EVENTS_FILE.exists():
+            with open(EVENTS_FILE, 'r') as f:
+                events = json.load(f)
+
+        events.append(event)
+        events = events[-100:]
+
+        with open(EVENTS_FILE, 'w') as f:
+            json.dump(events, f, indent=2)
+
+        return web.json_response({"status": "received"})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=400)
+
+app = web.Application()
+app.router.add_post('/webhook/github', handle_webhook)
+
+if __name__ == '__main__':
+    print("🚀 Starting webhook server on http://localhost:8080")
+    print("🔗 Webhook URL: http://localhost:8080/webhook/github")
+    web.run_app(app, host='localhost', port=8080)

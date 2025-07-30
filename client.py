@@ -1,83 +1,94 @@
 import os
-import json
 from openai import OpenAI
+from fastmcp import Client
 from dotenv import load_dotenv
-from fastmcp import Client 
 import asyncio
 
-
 load_dotenv()
-client = OpenAI()
 
-mcp_client = Client("http://localhost:8050")
+client = OpenAI()
+mcp_client = Client("http://localhost:8050/mcp/")
 
 messages = [
-    {"role": "system", "content": 
-    "You are a GitHub monitoring assistant "
-    "If the user asks repository status or recent GitHub action "
-    "use the get_repository_status_tool tool."
-    "For general questions, respond using your own reasoning."}
-    ]
-
+    {"role": "system", "content":
+     "You are a GitHub monitoring assistant. "
+     "If the user asks for recent GitHub events, use get_recent_action_events. "
+     "If the user asks for repository status, use get_repository_status."}
+]
 tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "get_repository_status_tool",
-                "description": "Returns recent GitHub webhook events stored by the server",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "limit":{
-                            "type":"integer",
-                            "description":"Number of recent events to fetch"
-                        }
-                    },
-                    "required": ["limit"],
-                },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_recent_action_events",
+            "description": "Get recent GitHub action events",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of recent events to return",
+                        "default": 10
+                    }
+                }
             }
-        },
-    ]
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_repository_status",
+            "description": "Get repository status report",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
+        }
+    }
+]
 
-print("🤖 Ask me anything! Type 'exit' to quit.\n")
+async def main():
+    async with mcp_client:
+        print("💬 Ask about your repository (type 'exit' to quit)")
+        while True:
+            user_input = input("You: ")
+            if user_input.lower() == 'exit':
+                break
 
-while True:
-    user_input = input("You: ")
-    if user_input.lower() == "exit":
-        break
+            messages.append({"role": "user", "content": user_input})
 
-    messages.append({"role": "user", "content": user_input})
+            response = client.chat.completions.create(
+                model="gpt-4.1-nano",
+                messages=messages,
+                tools=tools,
+                tool_choice="auto"
+            )
 
-    response = client.chat.completions.create(model="gpt-4.1-nano", messages=messages, tools=tools, tool_choice="auto")
+            choice = response.choices[0]
+            tool_calls = getattr(choice.message, "tool_calls", None)
 
-    message = response.choices[0].message
-
-    if hasattr(message, "tool_calls") and message.tool_calls:
-        for tool_call in message.tool_calls:
-            # print("Tool was used by the agent")
-            function_name = tool_call.function.name
-            arguments = json.loads(tool_call.function.arguments)
-
-            if function_name == "get_repository_status_tool":
-                result = mcp_client.call_tool("get_repository_status_tool", arguments)
-            else:
-                print(f"⚠️ Unknown function called: {function_name}")
-                continue
-
-            messages.append(message)
-            messages.append({"role": "tool","tool_call_id": tool_call.id,"content": str(result)})
-            print(f"Tool used: {function_name}")
-
-            follow_up = client.chat.completions.create(
+            if tool_calls:
+                tool_results = []
+                for call in tool_calls:
+                    tool_name=call.function.name
+                    arguments=call.arguments or {}
+                    tool_result = await mcp_client.call_tool(tool_name,**arguments)
+                    tool_results.append({"role": "tool", "name": tool_name, "content": tool_result})
+                messages.extend(tool_results)
+                response = client.chat.completions.create(
                     model="gpt-4.1-nano",
                     messages=messages
                 )
-            reply = follow_up.choices[0].message.content
-            messages.append({"role": "assistant", "content": reply})
-            print(f"Agent: {reply}")
-    else:
-        print("LLM answered without using a tool")
-        reply = message.content
-        messages.append(message)
-        print(f"Agent: {reply}")
+                answer = response.choices[0].message.content
+            else:
+                answer = choice.message.content
+
+            print(f"🤖 {answer}")
+            messages.append({"role": "assistant", "content": answer})
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+
+
 
