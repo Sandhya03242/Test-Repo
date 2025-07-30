@@ -13,7 +13,7 @@ def get_recent_actions_events(limit: int = 10) -> str:
     with EVENTS_FILE.open("r") as file:
         events = json.load(file)
     return json.dumps(events[-limit:], indent=2)
-
+@mcp.tool()
 def get_repository_status():
     try:
         result_json = get_recent_actions_events(limit=10)
