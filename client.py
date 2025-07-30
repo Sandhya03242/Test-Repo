@@ -3,11 +3,12 @@ from openai import OpenAI
 from fastmcp import Client
 from dotenv import load_dotenv
 import asyncio
+import json
 
 load_dotenv()
 
 client = OpenAI()
-mcp_client = Client("http://localhost:8050/mcp/")
+mcp_client = Client("http://localhost:8000/mcp/")
 
 messages = [
     {"role": "system", "content":
@@ -70,10 +71,13 @@ async def main():
                 tool_results = []
                 for call in tool_calls:
                     tool_name=call.function.name
-                    arguments=call.arguments or {}
+                    arguments=json.loads(call.function.arguments)
+                    tool_call_id=call.id
                     tool_result = await mcp_client.call_tool(tool_name,**arguments)
-                    tool_results.append({"role": "tool", "name": tool_name, "content": tool_result})
+                    tool_results.append({"role": "tool", "tool_call_id":tool_call_id, "content": str(tool_result)})
+                messages.append(choice.message)
                 messages.extend(tool_results)
+
                 response = client.chat.completions.create(
                     model="gpt-4.1-nano",
                     messages=messages
@@ -87,6 +91,11 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+
+
+
 
 
 

@@ -43,7 +43,7 @@ def get_repository_status() -> str:
 
 if __name__ == "__main__":
     print("Running repo status tools server...")
-    mcp.run(transport="http", host="localhost", port=8050)
+    mcp.run(transport="http", host="localhost", port=8000)
 
 
     
