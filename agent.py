@@ -16,9 +16,7 @@ load_dotenv()
 
 class AgentState(TypedDict):
     message:Annotated[Sequence[BaseMessage],add_messages]
-# -------------------------------------------------------------------------------------------------------------------
-# Github
-# --------------------------------------------------------------------------------------------------------------------
+
 
 GITHUB_TOKEN=os.environ.get("GITHUB_PAT")
 owner="Sandhya03242"
